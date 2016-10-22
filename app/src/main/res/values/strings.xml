@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">WordCard</string>
+    <string name="appwidget_text">EXAMPLE</string>
+    <string name="add_widget">Add widget</string>
+    <string name="configure">Configure</string>
+    <string name="widget_name">Word Card</string>
+    <string name="hello">Hello there! First you should add few word pairs(you can add some more later)</string>
+    <string name="hello2">Now press the add button to add the WordCard</string>
+    <string name="title_activity_add_widget">AddWidgetActivity</string>
+    <string name="hdpi_text_size">24sp</string>
+    <string name="next">Next</string>
+    <string name="example_mother">мама - mother</string>
+    <string name="add">add</string>
+    <string name="delete">Delete</string>
+</resources>
