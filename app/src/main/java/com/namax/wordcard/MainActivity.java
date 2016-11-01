@@ -1,34 +1,43 @@
 package com.namax.wordcard;
 
+import android.appwidget.AppWidgetManager;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+
 import android.view.ContextMenu;
-import android.view.Gravity;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.TextView;
+import android.widget.ListView;
+import android.widget.SimpleCursorAdapter;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, LoaderManager.LoaderCallbacks<Cursor> {
+
+    private static final int CONTEXT_MENU_DELETE_ID = 1;
+
+
+    public final static String WIDGET_PREF = "widget_pref";
     final static String LOG_TAG = "wordcard_logs";
+    int widgetID = AppWidgetManager.INVALID_APPWIDGET_ID;
+    Intent resultValue;
 
     EditText editTextNativeLng, editTextTargetLng;
-    Button addFirstBtn, nextFirstBtn;
-    LinearLayout firstList;
-
-    DBHelper dbHelper;
-    SQLiteDatabase database;
-    int nextID;
+    Button addBtn;
+    ListView wordList;
+    DataBase database;
+    SimpleCursorAdapter cursorAdapter;
 
 
     @Override
@@ -36,30 +45,39 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        setResult(RESULT_CANCELED);
+        Intent intent = getIntent();
+        Bundle extras = intent.getExtras();
+        if (extras != null){
+            widgetID = extras.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
+            resultValue = new Intent();
+            WordCardWidget.updateAppWidget(this, AppWidgetManager.getInstance(this), widgetID);
+            resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetID);
+            setResult(RESULT_OK, resultValue);
+        }
+
+
         editTextNativeLng = (EditText) findViewById(R.id.editTextNativeLng);
         editTextTargetLng = (EditText) findViewById(R.id.editTextTargetLng);
 
-        addFirstBtn = (Button) findViewById(R.id.addFirstBtn);
-        addFirstBtn.setOnClickListener(this);
+        addBtn = (Button) findViewById(R.id.btnAdd);
+        addBtn.setOnClickListener(this);
 
-        nextFirstBtn = (Button) findViewById(R.id.nextFirstBtn);
-        nextFirstBtn.setOnClickListener(this);
+        database = new DataBase(this);
+        database.open();
 
-        firstList = (LinearLayout) findViewById(R.id.firstList);
+        //сопоставляем данные из базы данных с соответстующими позициями в item_pair
+        String[] from = new String[] {DataBase.KEY_NATIVE_WORD, DataBase.KEY_TARGET_WORD};
+        int[] to = new int[] {R.id.tvNativeWord, R.id.tvTargetWord};
 
-        dbHelper = new DBHelper(this);
-        database = dbHelper.getWritableDatabase();
-        Cursor cursor = database.query(DBHelper.TABLE_WORDPAIRS, null, null, null, null, null, null);
-        if (cursor.getCount() == 0) nextID = 0;
-        else {
-            cursor.moveToLast();
+        cursorAdapter = new SimpleCursorAdapter(this, R.layout.item_pair, null, from, to, 0);
+        wordList = (ListView) findViewById(R.id.wordList);
+        wordList.setAdapter(cursorAdapter);
 
-            int columnIndex = cursor.getColumnIndex(DBHelper.KEY_ID);
-            int lastIndex = cursor.getInt(columnIndex);
-            nextID = lastIndex + 1; // допустим последний индекс 0 (всего 1 элемент), значит следующий id = 1;
-        }
-        cursor.close();
-        Log.d(LOG_TAG, "next ID is " + nextID);
+
+        registerForContextMenu(wordList);
+
+        getSupportLoaderManager().initLoader(0, null, this); //исключение
 
     }
 
@@ -73,64 +91,83 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         switch (view.getId())
         {
-            case R.id.addFirstBtn:
+            case R.id.btnAdd:
                 if (nativeWord.equals("") || targetWord.equals("")) return;
                 else {
-                    addPairToDatabase(nativeWord, targetWord);
-                    addPairToList(nativeWord, targetWord);
+                    database.addPair(nativeWord, targetWord);
+                    getSupportLoaderManager().getLoader(0).forceLoad();
+
+//                    addPairToDatabase(nativeWord, targetWord);
+//                    addPairToList(nativeWord, targetWord);
                     break;
                 }
-
-            case R.id.nextFirstBtn:
-                Intent intent = new Intent(this, AddWidgetActivity.class);
-                startActivity(intent);
-
         }
-
-        dbHelper = new DBHelper(this);
-
-    }
-
-    private void addPairToDatabase(String nativeWord, String targetWord) { //добавляем строки в базу данных, с которой будет работаь виджет
-
-        ContentValues contentValues = new ContentValues();
-        contentValues.put(DBHelper.KEY_NATIVE_WORD, nativeWord);
-        contentValues.put(DBHelper.KEY_TARGET_WORD, targetWord);
-        database.insert(DBHelper.TABLE_WORDPAIRS, null, contentValues);
-        Cursor cursor = database.query(DBHelper.TABLE_WORDPAIRS, null, null, null, null, null, null);
-        Log.d(LOG_TAG, "current row count: " + cursor.getCount());
-        cursor.close();
-    }
-
-    private void addPairToList(String nativeWord, String targetWord) {
-        float scaledDensity = this.getResources().getDisplayMetrics().scaledDensity;//масштаб
-        LinearLayout.LayoutParams pairParams = new LinearLayout.LayoutParams
-                (ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        pairParams.topMargin = (int) getResources().getDimension(R.dimen.activity_vertical_margin);
-
-        TextView pair = new TextView(this);
-        pair.setText(nativeWord + " - " + targetWord);
-        pair.setTextSize(getResources().getDimension(R.dimen.hdpi_text_size)/scaledDensity); //так не пойдет, нужна другая константа
-        pair.setGravity(Gravity.CENTER_HORIZONTAL);
-        pair.setId(nextID++); //устанавливаем id и увеличиваем на 1
-        firstList.addView(pair, 0, pairParams);
-        Log.d(LOG_TAG, "current TextView ID: " + pair.getId());
-        Log.d(LOG_TAG, "next TextView will have ID: " + nextID);
-        registerForContextMenu(pair);
     }
 
     @Override
-    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) { // взял из проекта калькулятор
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
         super.onCreateContextMenu(menu, v, menuInfo);
-        menu.add(Menu.NONE, v.getId(), Menu.NONE, R.string.delete);
+
+        menu.add(0, CONTEXT_MENU_DELETE_ID, 0, R.string.delete);
+
     }
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
+        if (item.getItemId() == CONTEXT_MENU_DELETE_ID){
+            //получаем id пункта, он будет равен id пункта в базе данных
+            AdapterView.AdapterContextMenuInfo contextMenuInfo = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
+            database.deletePair(contextMenuInfo.id);
 
-        firstList.removeView(firstList.findViewById(item.getItemId()));
-        String id = "" + item.getItemId();
-        database.delete(DBHelper.TABLE_WORDPAIRS, DBHelper.KEY_ID + "= ?", new String[] {id});
+            //получаем новый курсор, который приведет список в соответствие базе данных
+
+            getSupportLoaderManager().getLoader(0).forceLoad();
+
+            //TODO проверить что будет если удалить
+            return true; // хз хачем
+        }
+
         return super.onContextItemSelected(item);
     }
+
+
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        database.close();
+    }
+
+
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        return new MyCursorLoader(this, database);
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+        cursorAdapter.swapCursor(data);
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+
+    }
+
+    static class MyCursorLoader extends CursorLoader{
+
+        DataBase dataBase;
+
+        public MyCursorLoader(Context context, DataBase dataBase) {
+            super(context);
+            this.dataBase = dataBase;
+        }
+
+        @Override
+        public Cursor loadInBackground() {
+            return dataBase.getAllData();
+        }
+    }
+
+
 }
