@@ -5,6 +5,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 
 import java.util.Random;
 
@@ -46,18 +47,26 @@ public class DataBase {
     }
 
     public Cursor getAllData(){
+
+        if (dbHelper == null)
+        {
+         DataBase dataBase = new DataBase(context);
+            dataBase.open();
+        }
         return sqLiteDatabase.query(TABLE_WORDPAIRS, null, null, null, null, null, null);
     }
 
     public String[] getRandomPair(){
+
         Cursor cursor = getAllData();
-        int randomId = new Random(cursor.getCount()-1).nextInt();
-        cursor.move(randomId);
+        int countOfElements =  cursor.getCount();
+        int randomRaw = (int)(Math.random() * countOfElements) + 1; // добавляем один, чтобы небыло нуля и последний элемент мог выбраться
+        Log.e(MainActivity.LOG_TAG, "randomRow is " + randomRaw);
+        cursor.move(randomRaw);
         int nativeWordIndex = cursor.getColumnIndex(KEY_NATIVE_WORD);
         int targetWordIndex = cursor.getColumnIndex(KEY_TARGET_WORD);
         String nativeWord = cursor.getString(nativeWordIndex);
         String targetWord = cursor.getString(targetWordIndex);
-
         return new String[]{nativeWord, targetWord};
     }
 
