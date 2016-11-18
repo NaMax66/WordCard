@@ -1,19 +1,20 @@
 package com.namax.wordcard;
-
 import android.appwidget.AppWidgetManager;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.os.Environment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
-
+import android.support.v7.widget.PopupMenu;
 import android.view.ContextMenu;
+import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
@@ -21,11 +22,23 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
+import android.widget.TextView;
+import android.widget.Toast;
+import com.google.android.gms.appindexing.Action;
+import com.google.android.gms.appindexing.AppIndex;
+import com.google.android.gms.appindexing.Thing;
+import com.google.android.gms.common.api.GoogleApiClient;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.channels.FileChannel;
 
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, LoaderManager.LoaderCallbacks<Cursor> {
+
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, LoaderManager.LoaderCallbacks<Cursor>, PopupMenu.OnMenuItemClickListener {
 
     private static final int CONTEXT_MENU_DELETE_ID = 1;
+    private static final int CONTEXT_MENU_MY_NOTE_BOOK_ID = 2;
 
 
     public final static String WIDGET_PREF = "widget_pref";
@@ -39,22 +52,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     DataBase database;
     SimpleCursorAdapter cursorAdapter;
 
+    TextView popupMarker;
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    private GoogleApiClient client;
+
+    //TODO добавить предложение добавить виджет
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        popupMarker = (TextView) findViewById(R.id.popupMarker);
 
         setResult(RESULT_CANCELED);
         Intent intent = getIntent();
         Bundle extras = intent.getExtras();
-        if (extras != null){
+        if (extras != null) {
             widgetID = extras.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
             resultValue = new Intent();
             WordCardWidget.updateAppWidget(this, AppWidgetManager.getInstance(this), widgetID);
             resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetID);
             setResult(RESULT_OK, resultValue);
-        }
+        } //нужно при добавлении нового виджета
 
 
         editTextNativeLng = (EditText) findViewById(R.id.editTextNativeLng);
@@ -66,19 +89,112 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         database = new DataBase(this);
         database.open();
 
+        getContentResolver(); // посмотрел здесь http://www.androiddesignpatterns.com/2012/05/correctly-managing-your-sqlite-database.html
+        //иначе вылетает исключение java.lang.IllegalStateException: attempt to re-open an already-closed object: SQLiteDatabase
+        //ошибка все равно возникает но только на тестах при перезапуске
+
         //сопоставляем данные из базы данных с соответстующими позициями в item_pair
-        String[] from = new String[] {DataBase.KEY_NATIVE_WORD, DataBase.KEY_TARGET_WORD};
-        int[] to = new int[] {R.id.tvNativeWord, R.id.tvTargetWord};
+        String[] from = new String[]{DataBase.KEY_NATIVE_WORD, DataBase.KEY_TARGET_WORD};
+        int[] to = new int[]{R.id.tvNativeWord, R.id.tvTargetWord};
 
         cursorAdapter = new SimpleCursorAdapter(this, R.layout.item_pair, null, from, to, 0);
         wordList = (ListView) findViewById(R.id.wordList);
-        wordList.setAdapter(cursorAdapter);
 
+        wordList.setAdapter(cursorAdapter);
+        wordList.setStackFromBottom(true);
 
         registerForContextMenu(wordList);
 
         getSupportLoaderManager().initLoader(0, null, this); //исключение
 
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return super.onCreateOptionsMenu(menu);
+    } //создал главное меню
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        switch (item.getItemId()) {
+            case R.id.makeBackup:
+                makeBackup();
+                break;
+            case R.id.loadBackup:
+                loadBackup();
+                break;
+            case R.id.loadFromAnotherDB:
+                //делаем архив нашей бд
+
+                //выбираем название приложения для перехода
+                //указываем путь к папке с помощью стороннего експлорера
+                //вызываем метод копирования баз данных
+                break;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void loadBackup() {
+
+        try {
+            File sd = Environment.getExternalStorageDirectory();
+
+            if (sd.canWrite()){
+                File currentDB = getDatabasePath(DataBase.DATABASE_NAME);
+                File backupPath = new File(Environment.getExternalStorageDirectory() + "/WordCards/");
+                File backupDB = new File(backupPath, DataBase.DATABASE_NAME);
+
+                if (backupDB.exists()){
+                    database.close();
+                    FileChannel src = new FileInputStream(backupDB).getChannel();
+                    FileChannel dst = new FileOutputStream(currentDB).getChannel();
+                    dst.transferFrom(src, 0, src.size());
+                    src.close();
+                    dst.close();
+                    database.open();
+                    getSupportLoaderManager().getLoader(0).forceLoad();
+                }
+                Toast.makeText(this, "Your database loaded", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Backup file is not exists", Toast.LENGTH_SHORT).show();
+        }
+
+
+    }
+
+    private void makeBackup() {
+        try {
+            File sd = Environment.getExternalStorageDirectory();
+
+            if (sd.canWrite()) {
+                File currentDB = getDatabasePath(DataBase.DATABASE_NAME);
+                File backupPath = new File(sd.toString() + "/WordCards/");
+                backupPath.mkdirs();
+                File backupDB = new File(backupPath, DataBase.DATABASE_NAME);
+
+                if (currentDB.exists()) {
+                    FileChannel src = new FileInputStream(currentDB).getChannel();
+                    FileChannel dst = new FileOutputStream(backupDB).getChannel();
+                    dst.transferFrom(src, 0, src.size());
+                    src.close();
+                    dst.close();
+                }
+            }
+
+            Toast.makeText(this, "Your database saved", Toast.LENGTH_SHORT).show();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "I can't save your database :(((", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
@@ -89,16 +205,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         String targetWord = editTextTargetLng.getText().toString();
         targetWord = targetWord.trim();
 
-        switch (view.getId())
-        {
+        switch (view.getId()) {
             case R.id.btnAdd:
                 if (nativeWord.equals("") || targetWord.equals("")) return;
                 else {
                     database.addPair(nativeWord, targetWord);
                     getSupportLoaderManager().getLoader(0).forceLoad();
-
-//                    addPairToDatabase(nativeWord, targetWord);
-//                    addPairToList(nativeWord, targetWord);
+                    SharedPreferences sp = this.getSharedPreferences(MainActivity.WIDGET_PREF, Context.MODE_PRIVATE);
+                    sp.edit().putString(WordCardWidget.NATIVE_WORD + widgetID, nativeWord)
+                            .putString(WordCardWidget.TARGET_WORD + widgetID, targetWord).commit();
+                    editTextTargetLng.setText("");
+                    editTextNativeLng.setText("");
+                    WordCardWidget.updateAppWidget(this, AppWidgetManager.getInstance(this), widgetID);
                     break;
                 }
         }
@@ -114,7 +232,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
-        if (item.getItemId() == CONTEXT_MENU_DELETE_ID){
+        if (item.getItemId() == CONTEXT_MENU_DELETE_ID) {
             //получаем id пункта, он будет равен id пункта в базе данных
             AdapterView.AdapterContextMenuInfo contextMenuInfo = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
             database.deletePair(contextMenuInfo.id);
@@ -131,13 +249,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
 
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
         database.close();
     }
-
 
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
@@ -154,7 +270,64 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     }
 
-    static class MyCursorLoader extends CursorLoader{
+    @Override
+    public boolean onMenuItemClick(MenuItem item) {
+
+        switch (item.getItemId()) {
+            case R.id.myWordBookApp:
+                Toast.makeText(this, "Определяем имя базы, имя таблицы(mots), имена столбцов mot - target word" +
+                        "descMot - nativeWord", Toast.LENGTH_LONG).show();
+                break;
+
+        }
+        return false;
+    }
+
+    public void showPopup(MenuItem item) {
+        PopupMenu popupMenu = new PopupMenu(this, popupMarker);
+        MenuInflater inflater = popupMenu.getMenuInflater();
+        popupMenu.setOnMenuItemClickListener(this);
+        inflater.inflate(R.menu.app_selection_menu, popupMenu.getMenu());
+        popupMenu.show();
+    }
+
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    public Action getIndexApiAction() {
+        Thing object = new Thing.Builder()
+                .setName("Main Page") // TODO: Define a title for the content shown.
+                // TODO: Make sure this auto-generated URL is correct.
+                .setUrl(Uri.parse("http://[ENTER-YOUR-URL-HERE]"))
+                .build();
+        return new Action.Builder(Action.TYPE_VIEW)
+                .setObject(object)
+                .setActionStatus(Action.STATUS_TYPE_COMPLETED)
+                .build();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client.connect();
+        AppIndex.AppIndexApi.start(client, getIndexApiAction());
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        AppIndex.AppIndexApi.end(client, getIndexApiAction());
+        client.disconnect();
+    }
+
+    static class MyCursorLoader extends CursorLoader {
 
         DataBase dataBase;
 
