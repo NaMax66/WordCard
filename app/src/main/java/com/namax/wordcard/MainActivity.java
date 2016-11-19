@@ -129,21 +129,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 loadBackup();
                 break;
             case R.id.loadFromAnotherDB:
-
                 makeBackup();//делаем архив нашей бд
-                //выбираем название приложения для перехода в методе OnMenuItemClick, который задает путь к целевой базе
-                //
-
-
-                //указываем путь к папке с помощью стороннего експлорера
-                //вызываем метод копирования баз данных
+                //остальное в OnMenuItemClick
                 break;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    public void showPopup(MenuItem item) {
+    public void showPopup(MenuItem item) { // этот метод прописан в menu_main.xml
         PopupMenu popupMenu = new PopupMenu(this, popupMarker);
         MenuInflater inflater = popupMenu.getMenuInflater();
         popupMenu.setOnMenuItemClickListener(this);
@@ -151,10 +145,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         popupMenu.show();
     }
 
+    public void showPopupTime(MenuItem item) {
+        PopupMenu popupMenu = new PopupMenu(this, popupMarker);
+        MenuInflater inflater = popupMenu.getMenuInflater();
+        popupMenu.setOnMenuItemClickListener(this);
+        inflater.inflate(R.menu.update_time_selector, popupMenu.getMenu());
+        popupMenu.show();
+    }
+
     @Override
     public boolean onMenuItemClick(MenuItem item) {
 
+        long updTime = 0;
+
         switch (item.getItemId()) {
+
             case R.id.myWordBookApp:
 
                 Intent intent = new Intent();
@@ -162,9 +167,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 intent.setType("*/*");
                 intent.setAction(Intent.ACTION_GET_CONTENT);
                 startActivityForResult(Intent.createChooser(intent, "Choose MyWordBook database"), 1001);
+                //далее в onActivityResult
                 break;
-
+            case R.id.oneMinute:
+                updTime = 60000;
+                break;
+            case R.id.fiveMinutes:
+                updTime = 300000;
+                break;
+            case R.id.tenMinutes:
+                updTime = 600000;
+                break;
+            case R.id.twentyMinutes:
+                updTime = 1200000;
+                break;
+            case R.id.thirtyMinutes:
+                updTime = 1800000;
+                break;
         }
+
+        Log.e(LOG_TAG, "updTime in MainActivity is " + updTime);
+
+        if  (updTime != 0)
+        {
+            SharedPreferences sp = this.getSharedPreferences(MainActivity.WIDGET_PREF, Context.MODE_PRIVATE);
+            sp.edit().putInt(WordCardWidget.UPD_TIME, (int)updTime).commit();
+            WordCardWidget.updateAppWidget(this, AppWidgetManager.getInstance(this), widgetID);
+        }
+
         return false;
     }
 
@@ -308,6 +338,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        WordCardWidget.updateAppWidget(this, AppWidgetManager.getInstance(this), widgetID);
         database.close();
     }
 
@@ -363,6 +394,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         AppIndex.AppIndexApi.end(client, getIndexApiAction());
         client.disconnect();
     }
+
+
 
     static class MyCursorLoader extends CursorLoader {
 
