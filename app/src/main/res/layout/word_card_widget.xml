@@ -2,6 +2,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#c090a4ae"
+    android:id="@+id/wordCardWidget"
     android:padding="@dimen/widget_margin">
 
     <TextView

@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">WordCard</string>
-    <string name="appwidget_text">EXAMPLE</string>
+    <string name="app_name">WordCards</string>
+    <string name="appwidget_text">WordCards</string>
     <string name="add_widget">Add widget</string>
     <string name="configure">Configure</string>
     <string name="widget_name">Word Card</string>
@@ -12,4 +12,8 @@
     <string name="example_mother">мама - mother</string>
     <string name="add">add</string>
     <string name="delete">Delete</string>
+    <string name="menu_make_backup">make backup</string>
+    <string name="load_backup">load backup</string>
+    <string name="load_from_an_db">load another base</string>
+    <string name="my_note_book">MyNoteBook app</string>
 </resources>

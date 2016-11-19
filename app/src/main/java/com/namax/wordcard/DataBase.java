@@ -14,10 +14,15 @@ import java.util.Random;
  */
 
 public class DataBase {
+    public static final String MY_WORD_BOOK_DB_NAME = "MyNoteBook";
+    public static final String MY_WORD_BOOK_TABLE_NAME = "Mots";
+
+    public static final String MY_WORD_BOOK_NATIVE_WORD = "descMot";
+    public static final String MY_WORD_BOOK_TARGET_WORD = "mot";
 
     public static final int DATABASE_VERSION = 1;
     public static final String DATABASE_NAME = "wordCardDB";
-    public static final String TABLE_WORDPAIRS= "wordpairs";
+    public static final String TABLE_WORDPAIRS = "wordpairs";
 
     public static final String KEY_ID = "_id";
     public static final String KEY_NATIVE_WORD = "native";
@@ -75,6 +80,37 @@ public class DataBase {
         contentValues.put(KEY_NATIVE_WORD, nativeWord);
         contentValues.put(KEY_TARGET_WORD, targetWord);
         sqLiteDatabase.insert(TABLE_WORDPAIRS, null, contentValues);
+    }
+
+    public void importFromExternalDB(String path, String externalDBName){
+
+        if (dbHelper == null)
+        {
+            DataBase dataBase = new DataBase(context);
+            dataBase.open();
+        }
+
+        switch (externalDBName){
+
+            case MY_WORD_BOOK_DB_NAME:
+
+                sqLiteDatabase.execSQL("ATTACH DATABASE " + "'" + path + "'" + " AS tempDb");
+                sqLiteDatabase.execSQL("INSERT INTO " + TABLE_WORDPAIRS + "(" +
+                        KEY_NATIVE_WORD + ", " + KEY_TARGET_WORD + ") " +
+                "SELECT " + MY_WORD_BOOK_NATIVE_WORD + ", " + MY_WORD_BOOK_TARGET_WORD + " FROM " +
+                "tempDb" + "." + MY_WORD_BOOK_TABLE_NAME + ";");
+
+                sqLiteDatabase.execSQL("DETACH tempDb");
+
+            break;
+        }
+
+//        ContentValues contentValues = new ContentValues();
+//        contentValues.put(KEY_NATIVE_WORD, nativeWord);
+//        contentValues.put(KEY_TARGET_WORD, targetWord);
+//        sqLiteDatabase.insert(TABLE_WORDPAIRS, null, contentValues);
+
+
     }
 
     public void deletePair(long id){

@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#3F51B5</color>
-    <color name="colorPrimaryDark">#303F9F</color>
-    <color name="colorAccent">#FF4081</color>
+    <color name="colorPrimary">#90a4ae</color>
+    <color name="colorPrimaryDark">#546e7a</color>
+    <color name="colorAccent">#894d68</color>
+    <color name="nativeTextColor">#7a5465</color>
+    <color name="colorDark">#263238</color>
+    <color name="colorPane">#76546e7a</color>
+    <color name="targetWidgetColor">#ce546e7a</color>
+    <color name="nativeWidgetColor">#ce7a5465</color>
 </resources>

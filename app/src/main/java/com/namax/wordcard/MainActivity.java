@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Environment;
 import android.support.v4.app.LoaderManager;
@@ -12,6 +13,7 @@ import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.PopupMenu;
+import android.util.Log;
 import android.view.ContextMenu;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -38,8 +40,6 @@ import java.nio.channels.FileChannel;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, LoaderManager.LoaderCallbacks<Cursor>, PopupMenu.OnMenuItemClickListener {
 
     private static final int CONTEXT_MENU_DELETE_ID = 1;
-    private static final int CONTEXT_MENU_MY_NOTE_BOOK_ID = 2;
-
 
     public final static String WIDGET_PREF = "widget_pref";
     final static String LOG_TAG = "wordcard_logs";
@@ -129,15 +129,72 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 loadBackup();
                 break;
             case R.id.loadFromAnotherDB:
-                //делаем архив нашей бд
 
-                //выбираем название приложения для перехода
+                makeBackup();//делаем архив нашей бд
+                //выбираем название приложения для перехода в методе OnMenuItemClick, который задает путь к целевой базе
+                //
+
+
                 //указываем путь к папке с помощью стороннего експлорера
                 //вызываем метод копирования баз данных
                 break;
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    public void showPopup(MenuItem item) {
+        PopupMenu popupMenu = new PopupMenu(this, popupMarker);
+        MenuInflater inflater = popupMenu.getMenuInflater();
+        popupMenu.setOnMenuItemClickListener(this);
+        inflater.inflate(R.menu.app_selection_menu, popupMenu.getMenu());
+        popupMenu.show();
+    }
+
+    @Override
+    public boolean onMenuItemClick(MenuItem item) {
+
+        switch (item.getItemId()) {
+            case R.id.myWordBookApp:
+
+                Intent intent = new Intent();
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("*/*");
+                intent.setAction(Intent.ACTION_GET_CONTENT);
+                startActivityForResult(Intent.createChooser(intent, "Choose MyWordBook database"), 1001);
+                break;
+
+        }
+        return false;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (resultCode == RESULT_OK) {
+            if (requestCode == 1001) {
+                Uri fileURI = data.getData();
+                String path = fileURI.getPath();
+
+                if (path.contains("MyNoteBook")){
+                    try {
+//                        File dbFile = new File(path);
+//                        SQLiteDatabase externalDB = SQLiteDatabase.openOrCreateDatabase(dbFile, null);
+                        database.importFromExternalDB(path, DataBase.MY_WORD_BOOK_DB_NAME);
+                        getSupportLoaderManager().getLoader(0).forceLoad();
+                        Toast.makeText(this, "Your base updated", Toast.LENGTH_LONG).show();
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+                else{
+                    Toast.makeText(this, "Вы выбрали неверный путь", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+
     }
 
     private void loadBackup() {
@@ -248,7 +305,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         return super.onContextItemSelected(item);
     }
 
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -270,26 +326,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     }
 
-    @Override
-    public boolean onMenuItemClick(MenuItem item) {
 
-        switch (item.getItemId()) {
-            case R.id.myWordBookApp:
-                Toast.makeText(this, "Определяем имя базы, имя таблицы(mots), имена столбцов mot - target word" +
-                        "descMot - nativeWord", Toast.LENGTH_LONG).show();
-                break;
-
-        }
-        return false;
-    }
-
-    public void showPopup(MenuItem item) {
-        PopupMenu popupMenu = new PopupMenu(this, popupMarker);
-        MenuInflater inflater = popupMenu.getMenuInflater();
-        popupMenu.setOnMenuItemClickListener(this);
-        inflater.inflate(R.menu.app_selection_menu, popupMenu.getMenu());
-        popupMenu.show();
-    }
 
     /**
      * ATTENTION: This was auto-generated to implement the App Indexing API.

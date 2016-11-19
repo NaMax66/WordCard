@@ -14,19 +14,19 @@
         android:layout_marginRight="150dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/tvNativeWord"
+        android:id="@+id/tvTargetWord"
         android:textSize="@dimen/hdpi_text_size"/>
 
     <TextView
         tools:text = "Давай покинем это место по добру, по здорову!"
         android:gravity="end"
-        android:textColor="@color/colorAccent"
+        android:textColor="@color/nativeTextColor"
         android:layout_marginStart="150dp"
         android:layout_marginLeft="150dp"
         android:layout_marginTop="8dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/tvTargetWord"
+        android:id="@+id/tvNativeWord"
         android:textSize="@dimen/hdpi_text_size"
          />
 </LinearLayout>
