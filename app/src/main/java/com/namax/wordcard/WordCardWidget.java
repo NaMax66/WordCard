@@ -1,16 +1,15 @@
 package com.namax.wordcard;
 
+import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageInfo;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.EditText;
 import android.widget.RemoteViews;
 
 /**
@@ -19,10 +18,15 @@ import android.widget.RemoteViews;
  */
 public class WordCardWidget extends AppWidgetProvider {
 
+    static long updateTime = 1200000;
+
+
+
     private static final String ACTION_FLIP = "com.namax.wordcard.flip_card";
     private static final String ACTION_NEXT_CARD = "com.namax.wordcard.next_card";
     public static final String NATIVE_WORD = "native_word";
     public static final String TARGET_WORD = "target_word";
+    public static final String UPD_TIME = "update_time";
     static String[] pair;
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager,
                                 int appWidgetId) {
@@ -32,16 +36,20 @@ public class WordCardWidget extends AppWidgetProvider {
         String TargetWord = sp.getString(TARGET_WORD + appWidgetId, "КартоСлов");
         boolean isTargetWord = sp.getBoolean(MainActivity.WIDGET_PREF + appWidgetId, true);
 
+        updateTime = (long) sp.getInt(UPD_TIME, 1200000);
+
+        Log.e(MainActivity.LOG_TAG, "upd time is " + updateTime);
+
         String word = "";
         int color;
 
         if (isTargetWord) { //эти настройки есть в color но если ссылаться на них они приходят в виде цифр
             word = TargetWord;
-            color = Color.parseColor("#ce546e7a");
+            color = Color.parseColor("#be90a4ae");
         }
         else{
             word = NativeWord;
-            color = Color.parseColor("#ce7a5465");
+            color = Color.parseColor("#beef5350");
         }
 
         sp.edit().putBoolean(MainActivity.WIDGET_PREF + appWidgetId, isTargetWord).commit(); // сохраняем текущее состояние карточки, чтобы проверить его в ресивере
@@ -72,6 +80,23 @@ public class WordCardWidget extends AppWidgetProvider {
         pendingIntent = PendingIntent.getBroadcast(context, appWidgetId, nextCard, 0);
         remoteViews.setOnClickPendingIntent(R.id.nextCardBtn, pendingIntent);
 
+
+        //удаляю предыдущую настройку периодичности
+        Intent intent = new Intent(context, WordCardWidget.class);
+        intent.setAction(ACTION_NEXT_CARD);
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        pendingIntent = PendingIntent.getBroadcast(context, appWidgetId, intent, 0);
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.cancel(pendingIntent);
+
+        //устанавливаю периодичность обновления
+        intent = new Intent(context, WordCardWidget.class);
+        intent.setAction(ACTION_NEXT_CARD);
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        pendingIntent = PendingIntent.getBroadcast(context, appWidgetId, intent, 0);
+        alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.set(AlarmManager.RTC, System.currentTimeMillis() + updateTime, pendingIntent);
+
         appWidgetManager.updateAppWidget(appWidgetId, remoteViews);
     }
 
@@ -99,7 +124,7 @@ public class WordCardWidget extends AppWidgetProvider {
     @Override
     public void onEnabled(Context context) {
         // Enter relevant functionality for when the first widget is created
-//        Intent intent = new Intent(context, WordCardWidget.class);
+
     }
 
     @Override
@@ -130,7 +155,7 @@ public class WordCardWidget extends AppWidgetProvider {
                 DataBase dataBase = new DataBase(context);
                 dataBase.open();
 
-                int elementCount = dataBase.getAllData().getCount();
+                int elementCount = dataBase.getData(null, null).getCount();
 
                 String currentNativeWord = sp.getString(TARGET_WORD + appWidgetId, "WordCards");
 

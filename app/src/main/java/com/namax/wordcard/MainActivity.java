@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Environment;
 import android.support.v4.app.LoaderManager;
@@ -13,6 +12,8 @@ import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.PopupMenu;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.Menu;
@@ -38,6 +39,9 @@ import java.nio.channels.FileChannel;
 
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, LoaderManager.LoaderCallbacks<Cursor>, PopupMenu.OnMenuItemClickListener {
+
+    static String nativeWord;
+    static String targetWord;
 
     private static final int CONTEXT_MENU_DELETE_ID = 1;
 
@@ -83,6 +87,42 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         editTextNativeLng = (EditText) findViewById(R.id.editTextNativeLng);
         editTextTargetLng = (EditText) findViewById(R.id.editTextTargetLng);
 
+        editTextNativeLng.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+                nativeWord = editTextNativeLng.getText().toString();
+                getSupportLoaderManager().getLoader(0).forceLoad();
+            }
+        });
+
+        editTextTargetLng.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+                targetWord = editTextTargetLng.getText().toString();
+                getSupportLoaderManager().getLoader(0).forceLoad();
+            }
+        });
+
         addBtn = (Button) findViewById(R.id.btnAdd);
         addBtn.setOnClickListener(this);
 
@@ -127,10 +167,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             case R.id.loadBackup:
                 loadBackup();
+                database.toLowerCase();
                 break;
             case R.id.loadFromAnotherDB:
-                makeBackup();//делаем архив нашей бд
+                makeBackup();
+
+                //делаем архив нашей бд
                 //остальное в OnMenuItemClick
+
                 break;
         }
 
@@ -263,6 +307,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             if (sd.canWrite()) {
                 File currentDB = getDatabasePath(DataBase.DATABASE_NAME);
+                Log.e(LOG_TAG, currentDB.toString());
                 File backupPath = new File(sd.toString() + "/WordCards/");
                 backupPath.mkdirs();
                 File backupDB = new File(backupPath, DataBase.DATABASE_NAME);
@@ -408,7 +453,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         @Override
         public Cursor loadInBackground() {
-            return dataBase.getAllData();
+            return dataBase.getData(nativeWord, targetWord);
         }
     }
 
